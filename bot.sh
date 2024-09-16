@@ -1,6 +1,8 @@
 TOKEN="bot token"
 last_update_id=0
 answered_messages=()
+users=()
+USER_FILE="users.txt"
 
 send_message() {
     local CHAT_ID="$1"
@@ -10,6 +12,13 @@ send_message() {
 
 get_updates() {
     curl -s -X GET "https://api.telegram.org/bot$TOKEN/getUpdates?offset=$last_update_id"
+}
+
+send_welcome_message() {
+    while IFS= read -r user_id; do
+        send_message "$user_id" "BOT is online" &> /dev/null
+        echo "sended > $user_id"
+    done < "$USER_FILE"
 }
 
 process_updates() {
@@ -29,7 +38,11 @@ process_updates() {
             username=$(_jq '.message.from.username')
             message_id=$(_jq '.message.message_id')
             usr=$(_jq '.message.chat.first_name')
-
+            if [[ ! " ${users[@]} " =~ " ${id} " ]]; then
+                users+=("$id")
+                echo "$id" >> "$USER_FILE"
+                send_message "$id" "online" &> /dev/null
+            fi
             if [[ ! " ${answered_messages[@]} " =~ " ${message_id} " ]]; then
 
                 json_output=$(jq -n \
@@ -50,6 +63,10 @@ process_updates() {
         done
     fi
 }
+
+if [[ -f "$USER_FILE" ]]; then
+    send_welcome_message
+fi
 
 while true; do
     process_updates
